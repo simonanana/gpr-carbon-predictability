@@ -1,0 +1,115 @@
+# Geopolitical Risk and Carbon Price Predictability
+
+**Out-of-sample evaluation of geopolitical risk as a carbon-price predictor, with a dimension-matched placebo design.**
+
+Replication code and results for *"Geopolitical Risk and Carbon Price Predictability: An Effect That Disappears"* (Yihan Guo, Nanyang Technological University).
+
+---
+
+## What this is
+
+A growing literature reports that geopolitical risk (GPR) improves out-of-sample forecasts of carbon allowance prices. This project re-examines that claim and identifies what produces it.
+
+The headline result is a non-result, and the interest lies in *how* it arises:
+
+| Exercise | Finding |
+|---|---|
+| **Frequency contrast** | At the monthly frequency conventional in this literature (*N* = 138), a GPR block lowers 95th-percentile pinball loss by **3.22%**. Holding the model space, estimators and tests fixed and changing only the sampling frequency to weekly (*N* = 604), the sign reverses to **−2.29%**. Neither nominal rejection survives correction across the seven quantiles tested. |
+| **Dimension-matched placebo** | Replacing the GPR block with an equal number of AR(1) noise series locates the source. Among 39 monthly specifications, the only one attaining a positive out-of-sample *R*² is the placebo (**+0.95%**). |
+| **Cross-market falsification** | Across nine allowance markets on four continents, the GPR block beats the noise block in five markets and loses in four (exact *p* = 1.00). Inverting the test bounds the mean cross-market improvement above by **+0.67 percentage points** of *R*²<sub>OS</sub> at the one-sided 95% level. |
+| **Dimensionality penalty** | Referencing the upper tail to the placebo rather than to the controls measures the cost of appending an uninformative block directly: **1.1 percentage points** of pinball loss. Against the correctly specified benchmark the tail effect disappears (6 of 9 markets, *p* = 0.51). |
+| **Supply-side channel** | In a conditional test on 2,998 primary-market auctions, the pricing of supply news is not geopolitically state-dependent against a randomisation-based placebo null (*p*<sub>rand</sub> = 0.73–0.94), and GPR does not predict the policy supply response (min Holm *p* = 1.00). |
+
+The conclusion is not that geopolitical risk is irrelevant to carbon markets, but that the existing evidence does not establish *economically exploitable* predictive value.
+
+## The methodological contribution
+
+Three ideas in this repository are reusable beyond the application, and are documented in [`docs/METHODOLOGY.md`](docs/METHODOLOGY.md):
+
+**1. The dimension-matched placebo.** Adding a block of *k* regressors to a forecasting model has an out-of-sample cost even when the block is pure noise, because the larger model must estimate *k* additional coefficients. Comparing "controls" against "controls + GPR" therefore tests a misspecified null: under the null of no incremental information, the larger model is *expected* to lose. Replacing the candidate block with an equal-cardinality block of AR(1) noise restores a median-zero null and makes the Diebold–Mariano statistic pivotal, because the two specifications are then non-nested and equal-dimensional.
+
+**2. The placebo as a reference distribution.** A single placebo draw is not enough when the candidate block contains interactions. Across three draws in an early version of the supply-side test, the apparent advantage of the GPR interaction over the noise interaction ranged from +5.0 to +15.8 percentage points while the GPR arm itself barely moved — the entire range came from how badly one noise draw happened to perform. Drawing *D* placebo blocks turns the comparison into a randomisation test with a genuine *p*-value.
+
+**3. Forecast-health diagnostics.** Out-of-sample *R*² is a mean-square statistic, so one catastrophic week moves it by hundreds of percentage points: over ~360 evaluation weeks, a single week with error thirty times the typical magnitude lowers it by roughly 250 points. Every *R*² reported here carries the share of squared error contributed by its worst one per cent of weeks, and an arm whose worst few weeks dominate is flagged rather than interpreted.
+
+## Repository layout
+
+```
+.
+├── src/
+│   ├── crossmarket_falsification.py   Cross-market out-of-sample evaluation (9 markets)
+│   ├── crossmarket_inference.py       Dependence-adjusted inference, exact permutation
+│   │                                  tests, equivalence bounds, power analysis
+│   ├── crossmarket_figures.py         Appendix figures A4 and A5
+│   ├── supply_interaction.py          Supply-side channel: randomisation placebo test,
+│   │                                  policy-response test, numerical safeguards
+│   └── fill_latex_macros.py           Writes results into the manuscript's macro block
+├── results/
+│   ├── crossmarket/                   X0–X5 (per-market), Y1–Y5 (inference layer)
+│   └── supply/                        S0–S5
+├── figures/
+│   ├── FA4_crossmarket_gains.pdf      Per-market gains vs controls and vs noise
+│   └── FA5_dependence_power.pdf       Dependence sensitivity and gradient-test power
+├── docs/
+│   ├── METHODOLOGY.md                 The three design ideas, stated formally
+│   ├── REPRODUCIBILITY.md             How to run; external dependencies
+│   └── DATA.md                        Sources, licensing, what cannot be redistributed
+└── paper/                             Working paper PDF
+```
+
+## Quickstart
+
+```bash
+pip install -r requirements.txt
+```
+
+Two of the five modules are **self-contained**: they need no raw data, only the
+per-market result file in `results/crossmarket/` (see [`results/README.md`](results/README.md)):
+
+```bash
+# Dependence-adjusted inference, exact permutation tests, equivalence bounds
+python src/crossmarket_inference.py --out results/crossmarket
+
+# Appendix figures
+python src/crossmarket_figures.py --xdir results/crossmarket --out figures
+```
+
+The estimation modules need the constructed panels (see [`docs/DATA.md`](docs/DATA.md)):
+
+```bash
+# Cross-market falsification (~5 min)
+python src/crossmarket_falsification.py --data data --out out_crossmarket --fast
+
+# Supply-side channel: inspect variable detection first, then run (~2 min)
+python src/supply_interaction.py --panel data/panel_weekly_v2.csv \
+    --out out_supply --inspect
+python src/supply_interaction.py --panel data/panel_weekly_v2.csv \
+    --out out_supply --placebo-draws 50 \
+    --news auc_cover_vw,auc_discount,auc_bid_range \
+    --volume auc_volume_dlog,auc_n,auc_n_cancelled
+```
+
+Naming the columns explicitly is preferred over keyword detection, so that the specification is reproducible from the command line alone.
+
+## Data availability
+
+Raw price data is **not** redistributed here. Allowance prices come from the ICAP Allowance Price Explorer and commercial vendor exports whose terms do not permit redistribution. What this repository contains is the code, the market-level and summary-level results, and the figures — sufficient to verify every inference step, though not to re-estimate forecasts from raw prices. [`docs/DATA.md`](docs/DATA.md) lists every source with its access route.
+
+Two exceptions are freely redistributable and can be downloaded directly: the Caldara–Iacoviello geopolitical risk index, and the Eurostat gas-import series.
+
+## Citation
+
+```bibtex
+@unpublished{Guo2026GPRCarbon,
+  author = {Guo, Yihan},
+  title  = {Geopolitical Risk and Carbon Price Predictability:
+            An Effect That Disappears},
+  year   = {2026},
+  note   = {Working paper, Nanyang Technological University.
+            Submitted to the 2026 Massey Sustainable Finance Conference}
+}
+```
+
+## License
+
+Code is released under the MIT License. Results files and figures are released under CC BY 4.0. See [`LICENSE`](LICENSE).
