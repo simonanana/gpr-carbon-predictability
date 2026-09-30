@@ -42,7 +42,7 @@ Produced by `src/crossmarket_inference.py`:
 
 ## `supply/`
 
-Produced by `src/supply_interaction.py`:
+Produced by `src/supply_interaction.py`
 
 | File | Contents |
 |---|---|
