@@ -2,7 +2,9 @@
 
 **Out-of-sample evaluation of geopolitical risk as a carbon-price predictor, with a dimension-matched placebo design.**
 
-Replication code and results for *"Geopolitical Risk and Carbon Price Predictability: An Effect That Disappears"* (Yihan Guo, Nanyang Technological University).
+Replication code and results for *"Geopolitical Risk and Carbon Price Predictability: An Effect That Disappears"* (Yihan Guo, Nanyang Technological University). Accepted at the 2026 Massey Sustainable Finance Conference.
+
+**Topics:** `out-of-sample-forecasting` · `placebo-test` · `forecast-evaluation` · `diebold-mariano` · `randomization-inference` · `specification-search` · `carbon-markets` · `emissions-trading` · `geopolitical-risk` · `climate-finance` · `reproducible-research` · `econometrics`
 
 ---
 
@@ -37,22 +39,37 @@ Three ideas in this repository are reusable beyond the application, and are docu
 ```
 .
 ├── src/
+│   ├── main_pipeline.py               Single-market pipeline at either frequency:
+│   │                                  feature construction, rolling-origin forecasts,
+│   │                                  dimension-matched placebo (T* and F* files)
+│   ├── oos_evaluation.py              Evaluation layer: metrics, tests, VaR
+│   │                                  backtests, bootstrap importance, plot inputs
+│   ├── frequency_figures.py           Figures 1-3 and the frequency-contrast table
 │   ├── crossmarket_falsification.py   Cross-market out-of-sample evaluation (9 markets)
 │   ├── crossmarket_inference.py       Dependence-adjusted inference, exact permutation
 │   │                                  tests, equivalence bounds, power analysis
 │   ├── crossmarket_figures.py         Appendix figures A4 and A5
 │   ├── supply_interaction.py          Supply-side channel: randomisation placebo test,
 │   │                                  policy-response test, numerical safeguards
-│   └── fill_latex_macros.py           Writes results into the manuscript's macro block
+│   ├── fill_latex_macros.py           Writes results into the manuscript's macro block
+│   ├── forecast_eval.py               R2_OS, Diebold-Mariano, Clark-West,
+│   │                                  Giacomini-White, MCS, Romano-Wolf, CER
+│   └── fast_estimator.py              Hyperparameter-cached estimator group
 ├── results/
+│   ├── main_weekly/                   Weekly single-market results (T*, F*)
+│   ├── main_monthly/                  Monthly single-market results (T*, F*)
 │   ├── crossmarket/                   X0–X5 (per-market), Y1–Y5 (inference layer)
 │   └── supply/                        S0–S5
 ├── figures/
+│   ├── F1_frequency_contrast.pdf      The frequency reversal (paper Figure 1)
+│   ├── F2_placebo_weekly.pdf          Placebo comparison, weekly
+│   ├── F2_placebo_monthly.pdf         Placebo comparison, monthly
+│   ├── F3_r2_distribution.pdf         R2_OS by model family, both frequencies
 │   ├── FA4_crossmarket_gains.pdf      Per-market gains vs controls and vs noise
 │   └── FA5_dependence_power.pdf       Dependence sensitivity and gradient-test power
 ├── docs/
 │   ├── METHODOLOGY.md                 The three design ideas, stated formally
-│   ├── REPRODUCIBILITY.md             How to run; external dependencies
+│   ├── REPRODUCIBILITY.md             How to run; what is and is not included
 │   └── DATA.md                        Sources, licensing, what cannot be redistributed
 └── paper/                             Working paper PDF
 ```
@@ -63,8 +80,8 @@ Three ideas in this repository are reusable beyond the application, and are docu
 pip install -r requirements.txt
 ```
 
-Two of the five modules are **self-contained**: they need no raw data, only the
-per-market result file in `results/crossmarket/` (see [`results/README.md`](results/README.md)):
+Three modules are **self-contained**: they need no raw data, only the result
+files already in `results/` (see [`results/README.md`](results/README.md)):
 
 ```bash
 # Dependence-adjusted inference, exact permutation tests, equivalence bounds
@@ -72,11 +89,20 @@ python src/crossmarket_inference.py --out results/crossmarket
 
 # Appendix figures
 python src/crossmarket_figures.py --xdir results/crossmarket --out figures
+
+# Figures 1-3 and the frequency-contrast table, from the shipped results
+python src/frequency_figures.py --weekly results/main_weekly \
+    --monthly results/main_monthly --out figures
 ```
 
 The estimation modules need the constructed panels (see [`docs/DATA.md`](docs/DATA.md)):
 
 ```bash
+# Single-market pipeline, weekly (~25 min; --fast for ~7 min)
+# --placebo-n must equal the number of GPR variables for a matched placebo
+python src/main_pipeline.py --panel data/panel_weekly_v2.csv \
+    --out out_v2 --placebo-n 9
+
 # Cross-market falsification (~5 min)
 python src/crossmarket_falsification.py --data data --out out_crossmarket --fast
 
@@ -106,7 +132,7 @@ Two exceptions are freely redistributable and can be downloaded directly: the Ca
             An Effect That Disappears},
   year   = {2026},
   note   = {Working paper, Nanyang Technological University.
-            Submitted to the 2026 Massey Sustainable Finance Conference}
+            Accepted at the 2026 Massey Sustainable Finance Conference}
 }
 ```
 

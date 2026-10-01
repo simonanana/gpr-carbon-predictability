@@ -1,10 +1,13 @@
 # Core numerical stack
-numpy>=1.24
+# numpy >= 2.0 is required: forecast_eval.crps_from_quantiles uses np.trapezoid,
+# which replaced np.trapz in numpy 2.0.
+numpy>=2.0
 pandas>=2.0
 scipy>=1.10
 
-# Estimators used by supply_interaction.py
+# Estimators
 scikit-learn>=1.3
+xgboost>=2.0          # required by fast_estimator.py
 
 # Figures
 matplotlib>=3.7
