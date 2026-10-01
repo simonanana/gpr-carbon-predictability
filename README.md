@@ -4,8 +4,6 @@
 
 Replication code and results for *"Geopolitical Risk and Carbon Price Predictability: An Effect That Disappears"* (Yihan Guo, Nanyang Technological University). Accepted at the 2026 Massey Sustainable Finance Conference.
 
----
-
 ## What this is
 
 A growing literature reports that geopolitical risk (GPR) improves out-of-sample forecasts of carbon allowance prices. This project re-examines that claim and identifies what produces it.
