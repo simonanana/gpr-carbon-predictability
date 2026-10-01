@@ -8,10 +8,15 @@ authors:
 license: MIT
 repository-code: "https://github.com/YOUR-USERNAME/gpr-carbon-predictability"
 keywords:
+  - dimension-matched placebo
+  - out-of-sample forecast evaluation
+  - forecast encompassing
+  - nested model comparison
+  - randomisation inference
+  - specification search
   - geopolitical risk
   - carbon price forecasting
-  - dimension-matched placebo
-  - out-of-sample evaluation
+  - emissions trading
   - EU ETS
   - replication
 preferred-citation:
@@ -22,4 +27,4 @@ preferred-citation:
       given-names: Yihan
       affiliation: Nanyang Technological University
   year: 2026
-  notes: "Working paper. Submitted to the 2026 Massey Sustainable Finance Conference."
+  notes: "Working paper. Accepted at the 2026 Massey Sustainable Finance Conference."
