@@ -96,8 +96,8 @@ USAGE
 
 REQUIRES
 --------
-    msfc_lib.py    r2_os, dm_test  (see docs/REPRODUCIBILITY.md)
-    msfc_fast.py   FastEstimator   (see docs/REPRODUCIBILITY.md)
+    forecast_eval.py   r2_os, dm_test
+    fast_estimator.py  FastEstimator  (needs scikit-learn and xgboost)
 =============================================================================
 """
 
@@ -111,8 +111,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats as st
 
-import msfc_lib as ml
-from msfc_fast import FastEstimator
+import forecast_eval as ml
+from fast_estimator import FastEstimator
 
 warnings.filterwarnings("ignore")
 
@@ -610,7 +610,8 @@ def main():
     for f in ("X0_market_oos.csv", "X1_market_results.csv",
               "X2_rank_correlations.csv", "X3_skipped_markets.csv",
               "X4_sign_tests.csv", "X5_estimator_matched.csv"):
-        print(f"  {f}")
+        if (out_dir / f).exists():
+            print(f"  {f}")
     print("\nnext: python src/crossmarket_inference.py --out " + str(out_dir))
 
 
