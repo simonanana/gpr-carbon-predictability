@@ -113,20 +113,65 @@ def resolve_dirs(patterns: list[str]) -> list[Path]:
 
 
 def load_draws(dirs: list[Path]) -> dict[str, pd.Series]:
-    """Return {dir_name: Series indexed by model, holding R2_OS}."""
+    """Return {dir_name: Series indexed by model, holding R2_OS}.
+
+    Directories without a readable T1 are collected and reported together
+    rather than aborting on the first one. A batch of draws launched from a
+    shell loop fails as a batch -- if the pipeline raised, every directory was
+    created and every one is empty -- and a report naming one of fifty would
+    hide that.
+    """
     draws: dict[str, pd.Series] = {}
+    absent: list[Path] = []
+    broken: list[str] = []
+
     for d in dirs:
         f = d / "T1_accuracy_metrics.csv"
         if not f.exists():
-            raise SystemExit(
-                f"\n[stop] {f} not found.\n"
-                f"  Every draw directory must hold a T1_accuracy_metrics.csv "
-                f"written by main_pipeline.py.")
-        t = pd.read_csv(f)
-        missing = {"model", METRIC} - set(t.columns)
-        if missing:
-            raise SystemExit(f"\n[stop] {f} is missing column(s): {sorted(missing)}")
+            absent.append(d)
+            continue
+        try:
+            t = pd.read_csv(f)
+        except Exception as exc:
+            broken.append(f"{f}: unreadable ({type(exc).__name__})")
+            continue
+        miss = {"model", METRIC} - set(t.columns)
+        if miss:
+            broken.append(f"{f}: missing column(s) {sorted(miss)}")
+            continue
+        if t.empty:
+            broken.append(f"{f}: no rows")
+            continue
         draws[d.name] = t.set_index("model")[METRIC]
+
+    if absent or broken:
+        n_bad = len(absent) + len(broken)
+        lines = [f"\n  [warn] {n_bad} of {len(dirs)} draw directories have no "
+                 f"usable T1_accuracy_metrics.csv"]
+        if absent:
+            shown = ", ".join(d.name for d in absent[:6])
+            more = f" (+{len(absent) - 6} more)" if len(absent) > 6 else ""
+            lines.append(f"         missing the file: {shown}{more}")
+        for b in broken[:6]:
+            lines.append(f"         {b}")
+        print("\n".join(lines))
+
+        if not draws:
+            raise SystemExit(
+                "\n[stop] not one draw directory holds a usable "
+                "T1_accuracy_metrics.csv.\n"
+                "  The directories exist but the runs that were supposed to "
+                "fill them did not\n"
+                "  finish. Scroll back through the loop's output for the "
+                "traceback, fix the\n"
+                "  cause, delete the empty directories and run the loop "
+                "again. A shell `for`\n"
+                "  loop keeps going after a crash, so a batch can leave "
+                "behind a full set of\n"
+                "  empty directories and look as though it worked.")
+
+    if not draws:
+        raise SystemExit("\n[stop] no draws could be loaded.")
     return draws
 
 
@@ -248,9 +293,20 @@ def main() -> None:
 
     dirs = resolve_dirs(args.dirs)
     if len(dirs) < 2:
+        found = "\n".join(f"    {d}  ({'exists' if d.exists() else 'DOES NOT EXIST'})"
+                          for d in dirs) or "    (nothing)"
         raise SystemExit(
-            f"\n[stop] need at least 2 draw directories, found {len(dirs)}.\n"
-            f"  Quote the glob so the shell does not expand it, or list the "
+            f"\n[stop] need at least 2 draw directories, found {len(dirs)}:\n"
+            f"{found}\n\n"
+            f"  Two things to check.\n"
+            f"  1. Have the draws been run yet? Each one is a separate "
+            f"main_pipeline.py run\n"
+            f"     with its own --placebo-seed and its own --out directory. "
+            f"Run the loop first,\n"
+            f"     then aggregate.\n"
+            f"  2. Quote the glob, as --dirs 'draws_monthly/seed*', so the "
+            f"shell does not\n"
+            f"     expand it before the module sees it. Or list the "
             f"directories individually.")
 
     out = Path(args.out)

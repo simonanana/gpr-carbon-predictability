@@ -264,6 +264,40 @@ FREQ_PARAMS = {
 }
 
 
+def panel_spacing_days(df: pd.DataFrame) -> float | None:
+    """Median spacing between consecutive observations, in days.
+
+    Used by the frequency guard in main(). Returns None when the frame carries
+    no usable dates, so that the caller can skip the check instead of failing:
+    a guard must never be the reason a run dies.
+
+    Two deliberate choices. The date is taken from the `date` COLUMN first,
+    because `build_features_weekly` ends with `reset_index()` and the index is a
+    RangeIndex by the time this is called; the DatetimeIndex branch is only a
+    fallback for callers that pass an earlier frame. And the timedelta is
+    converted through numpy rather than the pandas `.dt` accessor, which raises
+    on a non-datetimelike Series and whose behaviour has moved across pandas
+    versions.
+    """
+    s = None
+    if "date" in df.columns:
+        s = df["date"]
+    elif isinstance(df.index, pd.DatetimeIndex):
+        s = pd.Series(df.index)
+    if s is None:
+        return None
+
+    s = pd.to_datetime(pd.Series(np.asarray(s)), errors="coerce").dropna()
+    if len(s) < 3:
+        return None
+    gaps = s.sort_values().diff().dropna()
+    if gaps.empty:
+        return None
+    days = gaps.to_numpy(dtype="timedelta64[s]").astype("float64") / 86400.0
+    days = days[np.isfinite(days) & (days > 0)]
+    return float(np.median(days)) if len(days) else None
+
+
 def build_features_weekly(panel_path: Path, price_dir: Path | None = None,
                           freq: str = "W-FRI", placebo_seed: int = 42,
                           fp: dict | None = None, n_placebo: int = 6) -> pd.DataFrame:
@@ -668,19 +702,34 @@ def main():
     # with monthly-length momentum and variance windows and a 60-period
     # training window. It runs to completion and prints "monthly periods",
     # so nothing downstream reveals the error. Refuse it here instead.
-    spacing = float(pd.Series(df.index).diff().dt.days.median())
-    expect = {"W": (4, 11), "M": (20, 45)}[args.freq]
-    if not (expect[0] <= spacing <= expect[1]):
+    #
+    # The check prints a confirmation line on success as well as a refusal on
+    # failure, so a log makes it visible that the guard actually ran. An
+    # earlier version read the dates off df.index, which build_features_weekly
+    # has already reset to a RangeIndex, and raised AttributeError on every
+    # invocation. A guard that cannot be seen succeeding is a guard nobody
+    # knows is broken.
+    spacing = panel_spacing_days(df)
+    lo, hi = {"W": (4, 11), "M": (20, 45)}[args.freq]
+    if spacing is None:
+        print(f"\n  [note] the panel carries no usable date column, so the "
+              f"frequency check is\n"
+              f"         skipped. Confirm yourself that the panel is "
+              f"{FP['label']}.")
+    elif not (lo <= spacing <= hi):
         other = "M" if args.freq == "W" else "W"
         raise SystemExit(
             f"\n[stop] --freq {args.freq} was requested, but the panel's median row "
-            f"spacing is {spacing:.0f} days.\n"
-            f"  Expected {expect[0]}-{expect[1]} days for --freq {args.freq}.\n"
+            f"spacing is {spacing:.1f} days.\n"
+            f"  Expected {lo}-{hi} days for --freq {args.freq}.\n"
             f"  --freq changes window lengths ONLY; it does not resample. The panel\n"
             f"  must already be at the requested frequency.\n"
             f"  Either pass the {'monthly' if args.freq == 'M' else 'weekly'} panel, "
             f"or run with --freq {other}.\n"
             f"  Panel given: {panel_path}")
+    else:
+        print(f"\n  [ok] panel row spacing {spacing:.1f} days is consistent with "
+              f"--freq {args.freq}")
 
     print(f"\n[data] {len(df)} {FP['label']} periods: "
           f"{df.date.min():%Y-%m-%d} ~ {df.date.max():%Y-%m-%d}")
