@@ -7,8 +7,36 @@ python -m venv venv && source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-Tested on Python 3.11 with numpy 2.x, pandas 2.x, scipy 1.x, scikit-learn 1.x
-and matplotlib 3.x.
+Every number in `results/` was produced on **Python 3.14.6** with the exact
+versions pinned in `requirements.txt`.
+
+### The pins matter
+
+Installing a different scikit-learn or xgboost release changes the
+estimator-dependent results while leaving the data-only benchmarks untouched.
+In one verified instance, the weekly pipeline run on a bit-identical panel gave
+a tau=0.95 pinball improvement of **−2.29% (DM p = 0.026)** under an earlier
+environment and **−2.39% (DM p = 0.059)** under the pinned one, moving the
+nominal *p*-value across 0.05. Meanwhile `B_zero`, `B_histmean` and `B_AR1`
+agreed to every printed digit, and the out-of-sample sample size was identical
+(604 periods, 404 out of sample, 386 common) — which is what identifies the
+regularised and boosted estimators, rather than the data, as the source.
+
+Two consequences:
+
+- Readers who install unpinned versions should expect the Ridge, ElasticNet,
+  PCR and gradient-boosting specifications to move by a few tenths of a
+  percentage point, and should **not** treat small discrepancies as evidence of
+  a coding error. The benchmarks are the diagnostic: if `B_zero` and `B_AR1`
+  reproduce exactly and the estimator rows do not, the difference is the
+  library version.
+- This sensitivity is itself a finding about out-of-sample evaluation practice.
+  A nominal rejection at the 5% level in a forecast comparison of this size does
+  not survive a change of library version, which is a further reason to read the
+  multiplicity-adjusted column rather than the nominal one.
+
+A full `pip freeze` of the environment is reproduced in `requirements.txt`,
+including transitive dependencies.
 
 ---
 
@@ -46,12 +74,13 @@ input.
 
 ## What is included
 
-All eight analysis modules plus their two dependencies are in `src/`:
+All nine analysis modules plus their two dependencies are in `src/`:
 
 | Module | Role | External deps |
 |---|---|---|
 | `main_pipeline.py` | Single-market pipeline, either frequency | `oos_evaluation`, `forecast_eval`, `fast_estimator` |
 | `oos_evaluation.py` | Evaluation layer for the single-market pipeline | `forecast_eval` |
+| `placebo_randomization.py` | Multi-draw placebo randomisation test | numpy/pandas |
 | `frequency_figures.py` | Figures 1–3, frequency-contrast table | + matplotlib |
 | `crossmarket_falsification.py` | Cross-market out-of-sample evaluation | `forecast_eval`, `fast_estimator` |
 | `crossmarket_inference.py` | Dependence-adjusted inference layer | numpy/pandas/scipy |
@@ -123,6 +152,23 @@ python src/main_pipeline.py --panel data/panel_weekly_v2.csv \
 python src/frequency_figures.py --weekly out_v2 --monthly out_monthly \
     --out figures
 
+# 0b. Multi-draw placebo. One run per seed; only the *_PLACEBO rows change,
+#     which placebo_randomization.py verifies before computing anything.
+#     Monthly is ~20 s per draw, weekly ~3 min, so run more draws monthly.
+for s in $(seq 1 50); do
+  python src/main_pipeline.py --panel data/panel_monthly_v2.csv \
+    --out draws_monthly/seed$s --freq M --placebo-n 9 --placebo-seed $s --fast
+done
+python src/placebo_randomization.py --dirs "draws_monthly/seed*" \
+    --label monthly --out results/placebo_randomization
+
+for s in $(seq 1 20); do
+  python src/main_pipeline.py --panel data/panel_weekly_v2.csv \
+    --out draws_weekly/seed$s --placebo-n 9 --placebo-seed $s --fast
+done
+python src/placebo_randomization.py --dirs "draws_weekly/seed*" \
+    --label weekly --out results/placebo_randomization
+
 # 1. Cross-market falsification, ~5 min with --fast
 python src/crossmarket_falsification.py --data data --out out_crossmarket --fast
 
@@ -169,6 +215,18 @@ project at least once.
   block estimates fewer coefficients, pays a smaller estimation-error penalty,
   and is therefore favoured, so "the GPR block fails to beat noise" is then
   partly a statement about dimension rather than about information.
+- A matched placebo is still **one draw**, and the module says so. Quantified:
+  changing the block from six series to nine, with the seed and everything else
+  held fixed, moves the placebo arm's *R*²<sub>OS</sub> by up to 3.7pp monthly
+  and 1.4pp weekly, in directions that differ across estimators. Below roughly
+  100 out-of-sample observations a single draw should not carry a headline
+  claim; run several `--placebo-seed` values and aggregate them with
+  `placebo_randomization.py`.
+- `placebo_randomization.py` refuses to compute a *p*-value if any non-placebo
+  row differs between draw directories. That is the signature of draws that
+  differ by more than the seed — a changed panel, a changed flag, a different
+  library version — which would make them non-exchangeable and the *p*-value
+  meaningless.
 
 **Cross-market:**
 
