@@ -71,10 +71,9 @@ Three ideas in this repository are reusable beyond the application, and are docu
 │   ├── FA4_crossmarket_gains.pdf      Per-market gains vs controls and vs noise
 │   └── FA5_dependence_power.pdf       Dependence sensitivity and gradient-test power
 ├── docs/
-│   ├── METHODOLOGY.md                 The three design ideas, stated formally
-│   ├── REPRODUCIBILITY.md             How to run; what is and is not included
-│   └── DATA.md                        Sources, licensing, what cannot be redistributed
-└── (paper/)                           Added at the tagged release; see Citation
+    ├── METHODOLOGY.md                 The three design ideas, stated formally
+    ├── REPRODUCIBILITY.md             How to run; what is and is not included
+    └── DATA.md                        Sources, licensing, what cannot be redistributed
 ```
 
 ## Quickstart
