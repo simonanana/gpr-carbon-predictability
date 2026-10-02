@@ -1,13 +1,42 @@
+# Environment pinned to the versions that produced every number in results/.
+#
+# These pins are not cosmetic. Re-running this pipeline under a different
+# scikit-learn or xgboost release changes the estimator-dependent results. In
+# one verified instance, the single-market weekly pipeline run on a
+# bit-identical panel produced a tau=0.95 pinball improvement of -2.29%
+# (Diebold-Mariano p = 0.026) under an earlier environment against -2.39%
+# (p = 0.059) under the pinned one, moving the nominal p-value across 0.05 --
+# while every data-only benchmark (B_zero, B_histmean, B_AR1) agreed to each
+# printed digit, which is what identifies the estimators rather than the data
+# as the source. Install these versions to reproduce results/ exactly.
+#
+# Python 3.14.6
+
 # Core numerical stack
-# numpy >= 2.0 is required: forecast_eval.crps_from_quantiles uses np.trapezoid,
-# which replaced np.trapz in numpy 2.0.
-numpy>=2.0
-pandas>=2.0
-scipy>=1.10
+# numpy >= 2.0 is required: forecast_eval.crps_from_quantiles uses
+# np.trapezoid, which replaced np.trapz in numpy 2.0.
+numpy==2.5.3
+pandas==3.0.6
+scipy==1.18.1
 
 # Estimators
-scikit-learn>=1.3
-xgboost>=2.0          # required by fast_estimator.py
+scikit-learn==1.9.1
+xgboost==3.4.1          # required by fast_estimator.py
 
 # Figures
-matplotlib>=3.7
+matplotlib==3.11.2
+
+# Transitive dependencies, pinned for completeness
+cloudpickle==3.1.2
+contourpy==1.4.0
+cycler==0.12.1
+fonttools==4.66.1
+joblib==1.6.0
+kiwisolver==1.5.1
+narwhals==2.26.0
+packaging==26.3
+pillow==12.3.0
+pyparsing==3.3.3
+python-dateutil==2.9.0.post0
+six==1.17.0
+threadpoolctl==3.7.0
