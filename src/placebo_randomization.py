@@ -1,0 +1,298 @@
+"""
+=============================================================================
+placebo_randomization.py -- turn the single-draw placebo into a p-value
+=============================================================================
+WHY THIS MODULE EXISTS
+----------------------
+`main_pipeline.py` draws one block of AR(1) noise and compares the GPR block
+against it. One draw is a comparison, not a test: it has no reference
+distribution, so it cannot produce a p-value, and the comparison inherits
+whatever that particular draw happened to do.
+
+How much that matters is measurable, and it is not small. Holding the panel,
+the seed and every other setting fixed and changing only the size of the noise
+block from six series to nine moved the placebo arm's out-of-sample R2 by up to
+3.7 percentage points at the monthly frequency and 1.4 points weekly, in
+inconsistent directions across estimators. With 75 monthly out-of-sample
+observations, a single draw is simply not an adequate reference for a
+nine-variable block.
+
+This module fixes that the same way `supply_interaction.py` already does: draw
+D placebo blocks, treat their R2 values as the null distribution, and report
+
+    p_rand = (1 + #{d : R2(PLACEBO_d) >= R2(GPR)}) / (1 + D)
+
+which is a valid one-sided randomisation p-value for the null that the GPR
+block carries no more information than an equal-cardinality noise block. The
++1 in both numerator and denominator is the standard correction that keeps the
+test exact for finite D (Phipson and Smyth 2010).
+
+HOW TO USE IT
+-------------
+Run the pipeline once per seed into its own output directory, then aggregate.
+Only the *_PLACEBO rows differ between runs, so each run contributes exactly
+one draw while reproducing every other number identically -- which this module
+verifies rather than assumes.
+
+    # monthly: about 20 s per draw
+    for s in $(seq 1 50); do
+      python src/main_pipeline.py --panel data/panel_monthly_v2.csv \
+        --out draws_monthly/seed$s --freq M --placebo-n 9 \
+        --placebo-seed $s --fast
+    done
+    python src/placebo_randomization.py --dirs "draws_monthly/seed*" \
+        --label monthly --out results/placebo_randomization
+
+    # weekly: about 3 min per draw, so run fewer or run it overnight
+    for s in $(seq 1 20); do
+      python src/main_pipeline.py --panel data/panel_weekly_v2.csv \
+        --out draws_weekly/seed$s --placebo-n 9 --placebo-seed $s --fast
+    done
+    python src/placebo_randomization.py --dirs "draws_weekly/seed*" \
+        --label weekly --out results/placebo_randomization
+
+Quote the glob so the shell does not expand it, or pass the directories
+individually. In zsh a bare `#` is not a comment, so do not paste trailing
+comments into the terminal.
+
+INPUTS
+------
+One `T1_accuracy_metrics.csv` per draw directory, written by
+`main_pipeline.py`. Columns used: `model`, `R2_OS_vs_histmean_pct`.
+
+OUTPUTS
+-------
+  P1_placebo_randomization_<label>.csv   one row per estimator: the null
+                                         summary and the randomisation p-value
+  P2_placebo_draws_<label>.csv           the null distribution, one row per
+                                         draw per estimator
+
+INTEGRITY CHECK
+---------------
+Before computing anything the module verifies that every non-placebo row is
+identical across draw directories. If it is not, the runs differ by more than
+the placebo seed -- a changed panel, a changed flag, a different library
+version -- and the draws are not exchangeable, so the p-value would be
+meaningless. The module says exactly which models disagree and exits.
+=============================================================================
+"""
+
+from __future__ import annotations
+
+import argparse
+import glob as globmod
+from pathlib import Path
+
+import numpy as np
+import pandas as pd
+
+ESTIMATORS = ("Ridge", "ENet", "PCR", "XGB")
+METRIC = "R2_OS_vs_histmean_pct"
+#: rows allowed to differ between draws
+PLACEBO_SUFFIX = "_CTRL_PLACEBO"
+#: tolerance for the integrity check, in percentage points of R2_OS
+TOL = 1e-9
+
+
+# =============================================================================
+# Loading
+# =============================================================================
+def resolve_dirs(patterns: list[str]) -> list[Path]:
+    """Expand globs and plain paths into a sorted, de-duplicated list."""
+    out: list[Path] = []
+    for p in patterns:
+        hits = [Path(h) for h in sorted(globmod.glob(p))]
+        out.extend(hits if hits else [Path(p)])
+    seen, uniq = set(), []
+    for d in out:
+        r = d.resolve()
+        if r not in seen:
+            seen.add(r)
+            uniq.append(d)
+    return uniq
+
+
+def load_draws(dirs: list[Path]) -> dict[str, pd.Series]:
+    """Return {dir_name: Series indexed by model, holding R2_OS}."""
+    draws: dict[str, pd.Series] = {}
+    for d in dirs:
+        f = d / "T1_accuracy_metrics.csv"
+        if not f.exists():
+            raise SystemExit(
+                f"\n[stop] {f} not found.\n"
+                f"  Every draw directory must hold a T1_accuracy_metrics.csv "
+                f"written by main_pipeline.py.")
+        t = pd.read_csv(f)
+        missing = {"model", METRIC} - set(t.columns)
+        if missing:
+            raise SystemExit(f"\n[stop] {f} is missing column(s): {sorted(missing)}")
+        draws[d.name] = t.set_index("model")[METRIC]
+    return draws
+
+
+# =============================================================================
+# Integrity check: the draws must differ by the placebo seed and nothing else
+# =============================================================================
+def check_exchangeable(draws: dict[str, pd.Series]) -> None:
+    names = list(draws)
+    ref_name = names[0]
+    ref = draws[ref_name]
+    problems: list[str] = []
+
+    for nm in names[1:]:
+        s = draws[nm]
+        only_ref = sorted(set(ref.index) - set(s.index))
+        only_s = sorted(set(s.index) - set(ref.index))
+        if only_ref or only_s:
+            problems.append(
+                f"    {nm}: model list differs from {ref_name}"
+                + (f"; missing {only_ref}" if only_ref else "")
+                + (f"; extra {only_s}" if only_s else ""))
+            continue
+        common = [m for m in ref.index if not m.endswith(PLACEBO_SUFFIX)]
+        a, b = ref[common], s[common]
+        diff = (a - b).abs()
+        bad = diff[diff > TOL]
+        if len(bad):
+            worst = bad.sort_values(ascending=False).head(5)
+            detail = ", ".join(f"{m} ({v:.4g}pp)" for m, v in worst.items())
+            problems.append(f"    {nm}: {len(bad)} non-placebo row(s) differ "
+                            f"from {ref_name}: {detail}")
+
+    if problems:
+        raise SystemExit(
+            "\n[stop] the draw directories differ by more than the placebo "
+            "seed:\n"
+            + "\n".join(problems)
+            + "\n\n  Only the *_CTRL_PLACEBO rows may change between draws. "
+              "Anything else means\n"
+              "  the runs used a different panel, a different flag, or a "
+              "different library\n"
+              "  version, so the draws are not exchangeable and a "
+              "randomisation p-value\n"
+              "  computed from them would be meaningless. Re-run the draws "
+              "changing only\n"
+              "  --placebo-seed and --out.")
+
+    print(f"  [ok] {len(names)} draws agree on every non-placebo row "
+          f"(tolerance {TOL:g}pp)")
+
+
+# =============================================================================
+# The test
+# =============================================================================
+def randomization_table(draws: dict[str, pd.Series]
+                        ) -> tuple[pd.DataFrame, pd.DataFrame]:
+    ref = draws[list(draws)[0]]
+    D = len(draws)
+    rows, long = [], []
+
+    for est in ESTIMATORS:
+        k_plc, k_gpr, k_ctrl = (f"{est}{PLACEBO_SUFFIX}",
+                                f"{est}_CTRL_GPRfull", f"{est}_CTRL")
+        if k_gpr not in ref.index or k_plc not in ref.index:
+            print(f"  [skip] {est}: {k_gpr} or {k_plc} absent from T1")
+            continue
+
+        r_gpr = float(ref[k_gpr])
+        r_ctrl = float(ref[k_ctrl]) if k_ctrl in ref.index else np.nan
+        null = np.array([float(s[k_plc]) for s in draws.values()], dtype=float)
+        null = null[np.isfinite(null)]
+        if len(null) == 0:
+            print(f"  [skip] {est}: every placebo draw is non-finite")
+            continue
+
+        n_ge = int((null >= r_gpr).sum())
+        p_rand = (1 + n_ge) / (1 + len(null))
+        rows.append({
+            "estimator": est,
+            "n_draws": len(null),
+            "r2_CTRL": round(r_ctrl, 4),
+            "r2_GPRfull": round(r_gpr, 4),
+            "placebo_mean": round(float(null.mean()), 4),
+            "placebo_sd": round(float(null.std(ddof=1)), 4) if len(null) > 1 else np.nan,
+            "placebo_min": round(float(null.min()), 4),
+            "placebo_p05": round(float(np.percentile(null, 5)), 4),
+            "placebo_p95": round(float(np.percentile(null, 95)), 4),
+            "placebo_max": round(float(null.max()), 4),
+            "placebo_range_pp": round(float(null.max() - null.min()), 4),
+            "n_draws_beating_gpr": n_ge,
+            "gpr_percentile_in_null": round(
+                float((null < r_gpr).mean() * 100), 1),
+            "randomization_p": round(p_rand, 4),
+        })
+        for nm, s in draws.items():
+            long.append({"estimator": est, "draw": nm,
+                         "r2_placebo": float(s[k_plc]), "r2_GPRfull": r_gpr})
+
+    if not rows:
+        raise SystemExit("\n[stop] no estimator had both a placebo and a "
+                         "GPRfull row; nothing to test.")
+    return pd.DataFrame(rows), pd.DataFrame(long)
+
+
+def main() -> None:
+    ap = argparse.ArgumentParser(
+        description="Aggregate several placebo draws into a randomisation test.")
+    ap.add_argument("--dirs", nargs="+", required=True,
+                    help="draw directories, or a quoted glob such as "
+                         "'draws_monthly/seed*'")
+    ap.add_argument("--label", default="run",
+                    help="suffix for the output filenames, e.g. weekly / monthly")
+    ap.add_argument("--out", default="results/placebo_randomization",
+                    help="output directory")
+    ap.add_argument("--min-draws", type=int, default=10,
+                    help="warn below this many draws (default 10). With D draws "
+                         "the smallest attainable p-value is 1/(1+D).")
+    args = ap.parse_args()
+
+    dirs = resolve_dirs(args.dirs)
+    if len(dirs) < 2:
+        raise SystemExit(
+            f"\n[stop] need at least 2 draw directories, found {len(dirs)}.\n"
+            f"  Quote the glob so the shell does not expand it, or list the "
+            f"directories individually.")
+
+    out = Path(args.out)
+    out.mkdir(parents=True, exist_ok=True)
+
+    print("=" * 78)
+    print(f"Placebo randomisation test -- {args.label}")
+    print("=" * 78)
+    print(f"  {len(dirs)} draw directories")
+
+    draws = load_draws(dirs)
+    check_exchangeable(draws)
+
+    D = len(draws)
+    p_min = 1 / (1 + D)
+    print(f"  smallest attainable p-value with D={D}: {p_min:.4f}")
+    if D < args.min_draws:
+        print(f"  WARNING: only {D} draws. The test cannot reject below "
+              f"{p_min:.3f}, so a\n"
+              f"           non-rejection here is uninformative rather than "
+              f"evidence for the null.")
+
+    tab, long = randomization_table(draws)
+
+    f1 = out / f"P1_placebo_randomization_{args.label}.csv"
+    f2 = out / f"P2_placebo_draws_{args.label}.csv"
+    tab.to_csv(f1, index=False)
+    long.to_csv(f2, index=False)
+
+    print(f"\n[{args.label}] randomisation test, R2_OS in percentage points")
+    print(tab.to_string(index=False))
+
+    print("\n  Reading this table:")
+    print("    randomization_p is one-sided for H0: the GPR block carries no")
+    print("    more information than an equal-cardinality noise block. A large")
+    print("    p means the GPR block is NOT distinguishable from noise.")
+    wide = tab["placebo_range_pp"].max()
+    print(f"    The widest placebo null spans {wide:.2f}pp across draws. Any")
+    print("    single-draw comparison inherits that much arbitrary variation.")
+
+    print(f"\n[done] {f1}\n       {f2}")
+
+
+if __name__ == "__main__":
+    main()

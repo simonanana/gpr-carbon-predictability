@@ -13,12 +13,31 @@ estimators and every test are identical. That is what makes the two
 frequencies directly comparable, and the contrast between them is the
 paper's central exercise.
 
+`--freq` DOES NOT RESAMPLE
+--------------------------
+This is the single most important thing to know before running the module.
+`--freq M` selects monthly window lengths; it does **not** convert a weekly
+panel to monthly. Each frequency needs its own panel:
+
+    --freq W   ->  data/panel_weekly_v2.csv    (about 604 rows, 7-day spacing)
+    --freq M   ->  data/panel_monthly_v2.csv   (about 138 rows, month-end)
+
+Passing the weekly panel with `--freq M` produces a hybrid that is neither
+frequency: 604 weekly rows modelled with monthly-length momentum and variance
+windows and a 60-period training window, yielding 544 "monthly" out-of-sample
+periods. It runs to completion and labels its own output "monthly", so nothing
+downstream reveals the error. A frequency guard in `main()` now refuses this
+combination by comparing the panel's median row spacing against `--freq`.
+
 DESIGN POINTS
 -------------
-  * Reads the weekly panel directly and keeps it at its native frequency.
-    Resampling back to monthly would return the sample to roughly 139
-    observations with 79 out-of-sample periods, at which point no claim in
-    the paper has the statistical power to support it.
+  * Each panel is kept at its native frequency and is never resampled inside
+    this module. The monthly arm is deliberately small (about 138 observations,
+    78 out of sample): that is the sample size conventional in this literature,
+    and demonstrating how fragile a result is at that size is the point of the
+    exercise rather than an accident to be corrected. Resampling silently
+    inside the weekly path, by contrast, is the defect that the superseded
+    feature-construction routine contained (see oos_evaluation.py).
 
   * The single-market panel and the long multi-market panel are NOT merged.
     The multi-market panel has one row per market per date, so combining them
@@ -48,17 +67,20 @@ The placebo is only interpretable as a dimension-matched control when it has
 the same cardinality as the block it stands in for. With the default settings
 the noise block has 6 series while CTRL_GPRfull adds 9 geopolitical
 variables, so the two are NOT matched and the module prints a warning saying
-so. Use `--placebo-n` to match them exactly. The default is left at 6 so that
-previously generated results reproduce; see docs/REPRODUCIBILITY.md for the
-direction of the resulting bias.
+so. `--placebo-n 9` matches them exactly and prints
+`[ok] placebo dimension-matched`. The default is left at 6 so that previously
+generated results reproduce; see docs/REPRODUCIBILITY.md for the direction of
+the resulting bias.
 
 USAGE
 -----
     python src/main_pipeline.py --panel data/panel_weekly_v2.csv \
-        --price-dir data --out out_weekly --fast
+        --price-dir data --out out_weekly --placebo-n 9 --fast
 
     python src/main_pipeline.py --panel data/panel_monthly_v2.csv \
-        --price-dir data --out out_monthly --freq M --fast
+        --price-dir data --out out_monthly --freq M --placebo-n 9 --fast
+
+Note the different panel on the second line. See "--freq DOES NOT RESAMPLE".
 =============================================================================
 """
 
@@ -596,6 +618,15 @@ def main():
                          "than the GPR block, so the placebo is not exactly "
                          "dimension-matched. Set this equal to the size of the "
                          "GPR block (printed below) for an exact match.")
+    ap.add_argument("--placebo-seed", type=int, default=42,
+                    help="seed for the AR(1) placebo block (default 42). Only the "
+                         "*_PLACEBO specifications depend on it; every other row of "
+                         "every output table is unchanged, because the "
+                         "hyperparameter cache is namespaced per feature set. Run "
+                         "the pipeline once per seed into separate --out "
+                         "directories, then aggregate them with "
+                         "placebo_randomization.py to turn the single-draw "
+                         "comparison into a randomisation test with a p-value.")
     ap.add_argument("--no-quantiles", action="store_true")
     args = ap.parse_args()
 
@@ -616,8 +647,10 @@ def main():
         price_dir = panel_path.parent
     print(f"  panel    : {panel_path}")
     print(f"  controls : {price_dir}")
+    print(f"  placebo  : {args.placebo_n} AR(1) series, seed {args.placebo_seed}")
     df = build_features_weekly(panel_path, price_dir, freq=FP["freq"], fp=FP,
-                               n_placebo=args.placebo_n)
+                               n_placebo=args.placebo_n,
+                               placebo_seed=args.placebo_seed)
     FS = make_feature_sets(set(df.columns))
 
     # state variables
@@ -627,6 +660,27 @@ def main():
     for _, (s, e) in CRISIS_WINDOWS.items():
         crisis |= ((tm >= pd.Timestamp(s)) & (tm <= pd.Timestamp(e))).values
     df["gpr_state_crisis"] = crisis.astype(float)
+
+    # ---- frequency guard ----------------------------------------------------
+    # --freq selects window lengths only; it does NOT resample. The panel must
+    # already be at the requested frequency. Passing the weekly panel with
+    # --freq M produces a hybrid that is neither: ~604 weekly rows modelled
+    # with monthly-length momentum and variance windows and a 60-period
+    # training window. It runs to completion and prints "monthly periods",
+    # so nothing downstream reveals the error. Refuse it here instead.
+    spacing = float(pd.Series(df.index).diff().dt.days.median())
+    expect = {"W": (4, 11), "M": (20, 45)}[args.freq]
+    if not (expect[0] <= spacing <= expect[1]):
+        other = "M" if args.freq == "W" else "W"
+        raise SystemExit(
+            f"\n[stop] --freq {args.freq} was requested, but the panel's median row "
+            f"spacing is {spacing:.0f} days.\n"
+            f"  Expected {expect[0]}-{expect[1]} days for --freq {args.freq}.\n"
+            f"  --freq changes window lengths ONLY; it does not resample. The panel\n"
+            f"  must already be at the requested frequency.\n"
+            f"  Either pass the {'monthly' if args.freq == 'M' else 'weekly'} panel, "
+            f"or run with --freq {other}.\n"
+            f"  Panel given: {panel_path}")
 
     print(f"\n[data] {len(df)} {FP['label']} periods: "
           f"{df.date.min():%Y-%m-%d} ~ {df.date.max():%Y-%m-%d}")
@@ -668,6 +722,11 @@ def main():
         else:
             print(f"\n  [ok] placebo dimension-matched: both blocks add "
                   f"{add_gpr} variables")
+            print(f"       This is one draw (seed {args.placebo_seed}). A single "
+                  f"draw is not a reference\n"
+                  f"       distribution: repeat with several --placebo-seed values "
+                  f"and aggregate\n"
+                  f"       them with placebo_randomization.py for a p-value.")
 
     est = FastEstimator(refresh_every=args.refresh_every, use_rf=not args.fast)
     print(f"\n[estimator] hyperparameters re-selected every {args.refresh_every} "
