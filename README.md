@@ -4,6 +4,10 @@
 
 Replication code and results for *"Geopolitical Risk and Carbon Price Predictability: An Effect That Disappears"* (Yihan Guo, Nanyang Technological University). Accepted at the 2026 Massey Sustainable Finance Conference.
 
+**Topics:** `out-of-sample-forecasting` · `placebo-test` · `forecast-evaluation` · `diebold-mariano` · `randomization-inference` · `specification-search` · `carbon-markets` · `emissions-trading` · `geopolitical-risk` · `climate-finance` · `reproducible-research` · `econometrics`
+
+---
+
 ## What this is
 
 A growing literature reports that geopolitical risk (GPR) improves out-of-sample forecasts of carbon allowance prices. This project re-examines that claim and identifies what produces it.
@@ -71,9 +75,10 @@ Three ideas in this repository are reusable beyond the application, and are docu
 │   ├── FA4_crossmarket_gains.pdf      Per-market gains vs controls and vs noise
 │   └── FA5_dependence_power.pdf       Dependence sensitivity and gradient-test power
 ├── docs/
-    ├── METHODOLOGY.md                 The three design ideas, stated formally
-    ├── REPRODUCIBILITY.md             How to run; what is and is not included
-    └── DATA.md                        Sources, licensing, what cannot be redistributed
+│   ├── METHODOLOGY.md                 The three design ideas, stated formally
+│   ├── REPRODUCIBILITY.md             How to run; what is and is not included
+│   └── DATA.md                        Sources, licensing, what cannot be redistributed
+└── (paper/)                           Added at the tagged release; see Citation
 ```
 
 ## Quickstart
