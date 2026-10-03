@@ -1,0 +1,28 @@
+{
+  "mcs_set": [
+    "B_histmean",
+    "B_AR1",
+    "B_zero",
+    "Ridge_CTRL",
+    "Ridge_CTRL_GPRlevel",
+    "Ridge_CTRL_GPRsurprise",
+    "Ridge_CTRL_GPRfull",
+    "XGB_CTRL",
+    "PCR_CTRL_GPRfull",
+    "COMB_equal_GPR"
+  ],
+  "mcs_pvalues": {
+    "XGB_CTRL_GPRfull": 0.061,
+    "B_histmean": 0.339,
+    "B_AR1": 0.339,
+    "B_zero": 0.339,
+    "Ridge_CTRL": 0.339,
+    "Ridge_CTRL_GPRlevel": 0.339,
+    "Ridge_CTRL_GPRsurprise": 0.339,
+    "Ridge_CTRL_GPRfull": 0.339,
+    "XGB_CTRL": 0.339,
+    "PCR_CTRL_GPRfull": 0.339,
+    "COMB_equal_GPR": 0.339
+  },
+  "alpha": 0.1
+}
