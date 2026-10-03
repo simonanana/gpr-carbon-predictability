@@ -1,0 +1,19 @@
+outcome,characteristic,n,spearman_rho,p_value
+gain_gpr_vs_ctrl,European geopolitical exposure,9,0.009,0.982
+gain_gpr_vs_ctrl,Energy import dependence,9,-0.138,0.724
+gain_gpr_vs_ctrl,Degree of auctioning,9,-0.191,0.623
+gain_gpr_vs_placebo,European geopolitical exposure,9,0.187,0.63
+gain_gpr_vs_placebo,Energy import dependence,9,0.138,0.724
+gain_gpr_vs_placebo,Degree of auctioning,9,-0.156,0.689
+pinball_gain_q95,European geopolitical exposure,9,-0.294,0.443
+pinball_gain_q95,Energy import dependence,9,-0.33,0.385
+pinball_gain_q95,Degree of auctioning,9,-0.017,0.965
+pinball_gain_q5,European geopolitical exposure,9,-0.249,0.517
+pinball_gain_q5,Energy import dependence,9,-0.495,0.175
+pinball_gain_q5,Degree of auctioning,9,0.355,0.348
+pinball_gain_plc_q95,European geopolitical exposure,9,0.062,0.873
+pinball_gain_plc_q95,Energy import dependence,9,0.028,0.944
+pinball_gain_plc_q95,Degree of auctioning,9,0.121,0.756
+pinball_gain_plc_q5,European geopolitical exposure,9,-0.249,0.517
+pinball_gain_plc_q5,Energy import dependence,9,-0.358,0.344
+pinball_gain_plc_q5,Degree of auctioning,9,0.312,0.414
