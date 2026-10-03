@@ -273,7 +273,53 @@ def randomization_table(draws: dict[str, pd.Series]
     if not rows:
         raise SystemExit("\n[stop] no estimator had both a placebo and a "
                          "GPRfull row; nothing to test.")
-    return pd.DataFrame(rows), pd.DataFrame(long)
+
+    tab = pd.DataFrame(rows)
+    return add_multiplicity(tab), pd.DataFrame(long)
+
+
+def add_multiplicity(tab: pd.DataFrame) -> pd.DataFrame:
+    """Adjust the per-estimator p-values for testing several estimators.
+
+    The randomisation p-value is exact for one estimator. The table runs the
+    same null against every estimator that produced both arms, so the smallest
+    of them is a minimum over a family and is not an exact 5% test. Reporting
+    only the raw column invites exactly the misreading this module exists to
+    prevent: one estimator out of four landing under 0.05 is close to what the
+    family produces under the null.
+
+    Bonferroni, Holm (step-down, FWER) and Benjamini-Hochberg (FDR) are all
+    reported because they answer different questions, and because quoting the
+    one that happens to be smallest is the error. Holm is the one to read for a
+    claim about any single estimator.
+    """
+    p = tab["randomization_p"].to_numpy(dtype=float)
+    m = len(p)
+    if m < 2:
+        tab["bonferroni"] = np.minimum(p, 1.0)
+        tab["holm"] = np.minimum(p, 1.0)
+        tab["bh_q"] = np.minimum(p, 1.0)
+        return tab
+
+    order = np.argsort(p, kind="stable")
+    ps = p[order]
+
+    bonf = np.minimum(p * m, 1.0)
+
+    holm_sorted = np.minimum(
+        np.maximum.accumulate(ps * (m - np.arange(m))), 1.0)
+    holm = np.empty(m)
+    holm[order] = holm_sorted
+
+    bh_sorted = np.minimum(
+        np.minimum.accumulate((ps * m / (np.arange(m) + 1))[::-1])[::-1], 1.0)
+    bh = np.empty(m)
+    bh[order] = bh_sorted
+
+    tab["bonferroni"] = np.round(bonf, 4)
+    tab["holm"] = np.round(holm, 4)
+    tab["bh_q"] = np.round(bh, 4)
+    return tab
 
 
 def main() -> None:
@@ -343,9 +389,41 @@ def main() -> None:
     print("    randomization_p is one-sided for H0: the GPR block carries no")
     print("    more information than an equal-cardinality noise block. A large")
     print("    p means the GPR block is NOT distinguishable from noise.")
+    print("    Read `holm`, not `randomization_p`, for a claim about any one")
+    print(f"    estimator: the table tests {len(tab)} of them against the same null.")
     wide = tab["placebo_range_pp"].max()
     print(f"    The widest placebo null spans {wide:.2f}pp across draws. Any")
     print("    single-draw comparison inherits that much arbitrary variation.")
+
+    # --- saturation: a p-value pinned at the floor is censored, not precise ---
+    # The column is rounded to four decimals, so compare on the integer count
+    # of draws that matched or beat the GPR arm rather than on the float.
+    at_floor = tab[tab["n_draws_beating_gpr"] == 0]
+    if len(at_floor):
+        names = ", ".join(at_floor["estimator"])
+        need = max(1, int(np.ceil(1 / 0.01)) - 1)
+        print(f"\n  NOTE: {names} sits exactly at the attainable floor "
+              f"{p_min:.4f} ({1}/{1 + D}),")
+        print(f"        because no draw matched or beat the GPR arm. The "
+              f"p-value is CENSORED there:")
+        print(f"        with D={D} the test cannot distinguish {p_min:.4f} from "
+              f"an arbitrarily small")
+        print(f"        value, so the figure must not be quoted as though it "
+              f"were precise. To")
+        print(f"        resolve below 0.01 the test needs D >= {need} draws.")
+
+    sig = tab[tab["holm"] < 0.05]
+    if len(sig):
+        print(f"\n  After Holm adjustment across {len(tab)} estimators, "
+              f"{len(sig)} still rejects at 5%:")
+        print(f"        {', '.join(sig['estimator'])}")
+    else:
+        print(f"\n  After Holm adjustment across {len(tab)} estimators nothing "
+              f"rejects at 5%")
+        print(f"        (smallest adjusted p = {tab['holm'].min():.4f}). The "
+              f"GPR block is not")
+        print(f"        distinguishable from an equal-cardinality noise block "
+              f"for any estimator.")
 
     print(f"\n[done] {f1}\n       {f2}")
 
