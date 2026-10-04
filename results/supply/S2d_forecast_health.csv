@@ -1,0 +1,7 @@
+estimator,info_set,sse_share_worst1pct,n_worst,max_abs_fcst_over_sd_y,pathological,r2_clipped,r2_unclipped
+Ridge,CTRL,17.6,4,0.69,False,-2.322,-2.322
+Ridge,CTRL_SUP,17.2,4,1.12,False,-2.714,-2.714
+Ridge,CTRL_SUP_GPRX,17.4,4,1.16,False,-7.304,-7.304
+ENet,CTRL,18.7,4,0.16,False,-0.154,-0.154
+ENet,CTRL_SUP,18.9,4,0.56,False,-0.347,-0.347
+ENet,CTRL_SUP_GPRX,18.8,4,0.96,False,-0.929,-0.929

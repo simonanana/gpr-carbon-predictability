@@ -1,0 +1,17 @@
+variable,role,coverage
+brent_m_ret,control,0.992
+natgas_m_ret,control,0.992
+coal_m_ret,control,0.992
+vstoxx_m,control,0.993
+cpu__cpu_index_narrow_log,control,0.969
+own_mom4,control,0.993
+own_rv12,control,0.98
+auc_cover_vw,auction_news,0.952
+auc_discount,auction_news,0.952
+auc_bid_range,auction_news,0.952
+auc_volume_dlog,auction_volume,0.932
+auc_n,auction_volume,1.0
+auc_n_cancelled,auction_volume,1.0
+gprd_surprise,gpr,1.0
+gprd_dlog,gpr,1.0
+gprd_log,gpr,1.0

@@ -1,0 +1,10 @@
+volume_var,gpr_var,n,lags,cond_XtX,cond_RVR,wald_chi2,p_value,sum_gpr_coefs_std,status,holm
+auc_volume_dlog,gprd_log,561,4,1.7e+01,2.7e+01,6.73,0.1509,-0.0127,ok,1.0
+auc_volume_dlog,gprd_surprise,561,4,7.1e+00,3.4e+00,6.515,0.1639,-0.0907,ok,1.0
+auc_volume_dlog,gprd_dlog,561,4,7.0e+00,4.6e+00,6.383,0.1723,-0.1174,ok,1.0
+auc_n_cancelled,gprd_dlog,602,4,3.2e+00,2.2e+02,3.082,0.5441,0.3458,ok,1.0
+auc_n_cancelled,gprd_surprise,602,4,2.2e+00,2.4e+02,3.049,0.5496,0.2052,ok,1.0
+auc_n_cancelled,gprd_log,602,4,1.7e+01,1.9e+02,2.977,0.5617,-0.0015,ok,1.0
+auc_n,gprd_dlog,602,4,6.3e+00,2.9e+00,2.672,0.6142,-0.0199,ok,1.0
+auc_n,gprd_surprise,602,4,6.3e+00,2.6e+00,2.565,0.633,0.0177,ok,1.0
+auc_n,gprd_log,602,4,1.7e+01,1.7e+01,2.401,0.6624,0.0251,ok,1.0

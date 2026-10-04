@@ -1,0 +1,3 @@
+estimator,n_oos,n_placebo_draws,r2_CTRL,r2_CTRL_SUP,r2_GPRX,placebo_mean,placebo_sd,placebo_p05,placebo_p95,gpr_percentile_in_null,randomization_p,r2_GPRX_unclipped,sse_share_worst1pct,max_abs_fcst_over_sd_y,status
+Ridge,379,50,-2.322,-2.714,-7.304,-4.762,1.558,-7.734,-2.45,6.0,0.9412,-7.304,17.4,1.16,ok
+ENet,379,50,-0.154,-0.347,-0.929,-0.576,0.805,-2.103,0.57,28.0,0.7255,-0.929,18.8,0.96,ok
