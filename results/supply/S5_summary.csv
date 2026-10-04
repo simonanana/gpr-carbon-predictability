@@ -1,0 +1,38 @@
+quantity,value
+N out-of-sample weeks,379
+N placebo draws,50
+N controls,7
+k of CTRL_SUP,11
+k of CTRL_SUP_GPRX,23
+Ridge: r2_CTRL,-2.322
+Ridge: r2_CTRL_SUP,-2.714
+Ridge: r2_GPRX,-7.304
+Ridge: placebo_mean,-4.762
+Ridge: placebo_sd,1.558
+Ridge: placebo_p05,-7.734
+Ridge: placebo_p95,-2.45
+Ridge: gpr_percentile_in_null,6.0
+Ridge: randomization_p,0.9412
+ENet: r2_CTRL,-0.154
+ENet: r2_CTRL_SUP,-0.347
+ENet: r2_GPRX,-0.929
+ENet: placebo_mean,-0.576
+ENet: placebo_sd,0.805
+ENet: placebo_p05,-2.103
+ENet: placebo_p95,0.57
+ENet: gpr_percentile_in_null,28.0
+ENet: randomization_p,0.7255
+policy: n stable specs,9
+policy: n UNSTABLE dropped,0
+policy: min raw p,0.1509
+policy: min Holm p,1.0
+in-sample: min raw p,0.0595
+in-sample: min Holm p,0.5355
+TNAC leave-out: n weeks,364
+Ridge: sse_share_worst1pct,17.4
+Ridge: r2_GPRX_unclipped,-7.304
+Ridge: status,ok
+ENet: sse_share_worst1pct,18.8
+ENet: r2_GPRX_unclipped,-0.929
+ENet: status,ok
+no-auction share of weeks (%),4.8
