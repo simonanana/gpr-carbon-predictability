@@ -4,6 +4,9 @@
 
 Replication code and results for *"Geopolitical Risk and Carbon Price Predictability: An Effect That Disappears"* (Yihan Guo, Nanyang Technological University). Accepted at the 2026 Massey Sustainable Finance Conference.
 
+**Topics:** `out-of-sample-forecasting` · `placebo-test` · `forecast-evaluation` · `diebold-mariano` · `randomization-inference` · `specification-search` · `carbon-markets` · `emissions-trading` · `geopolitical-risk` · `climate-finance` · `reproducible-research` · `econometrics`
+
+---
 
 ## What this is
 
@@ -14,7 +17,9 @@ The headline result is a non-result, and the interest lies in *how* it arises:
 | Exercise | Finding |
 |---|---|
 | **Frequency contrast** | At the monthly frequency conventional in this literature (*N* = 138, 75 out of sample), a GPR block lowers 95th-percentile pinball loss by **3.33%**. Holding the model space, estimators and tests fixed and changing only the sampling frequency to weekly (*N* = 604, 386 out of sample), the sign reverses to **−2.39%**. Neither is significant even nominally (Diebold–Mariano *p* = 0.329 and 0.059); the smallest *p*-value across all fourteen tests is 0.059; and **4 of 7 quantile levels change sign** between the two frequencies. |
-| **Dimension-matched placebo** | Replacing the GPR block with an equal number of AR(1) noise series locates the source. Among the 35 modelled weekly specifications, the only one attaining a positive out-of-sample *R*² is the placebo (**+0.14%**), and all three estimators place the GPR block below the matched noise block. At the monthly frequency the same comparison is uninterpretable: a single noise draw moves *R*²<sub>OS</sub> by up to **3.7 percentage points**, against 1.4 points weekly. |
+| **Dimension-matched placebo** | Replacing the GPR block with an equal number of AR(1) noise series locates the source. Among the 35 modelled weekly specifications, the only one attaining a positive out-of-sample *R*² is the placebo (**+0.14%**). |
+| **Randomisation test on the placebo** | Drawing the noise block 20 times weekly and 50 times monthly turns that comparison into a test rather than an anecdote. **No estimator distinguishes the GPR block from an equal-cardinality noise block at either frequency** — smallest Holm-adjusted *p* = 0.76 weekly and 0.08 monthly — and the GPR arm sits at percentiles 20–85 of its own null weekly, 44–100 monthly. |
+| **Why the monthly design cannot settle it** | The placebo null is **4–13 times wider** at the monthly frequency than at the weekly one (standard deviation 2.5–6.5 against 0.4–1.4 percentage points). Sample size alone predicts a factor of √(386/75) = 2.3, so most of the excess is the cost of estimating 20 coefficients on 75 out-of-sample observations. Against a null that wide, a single-draw comparison carries no information in either direction. |
 | **Cross-market falsification** | Across nine allowance markets on four continents, the GPR block beats the noise block in five markets and loses in four (exact *p* = 1.00). Inverting the test bounds the mean cross-market improvement above by **+0.67 percentage points** of *R*²<sub>OS</sub> at the one-sided 95% level. |
 | **Dimensionality penalty** | Referencing the upper tail to the placebo rather than to the controls measures the cost of appending an uninformative block directly: **1.1 percentage points** of pinball loss. Against the correctly specified benchmark the tail effect disappears (6 of 9 markets, *p* = 0.51). |
 | **Supply-side channel** | In a conditional test on 2,998 primary-market auctions, the pricing of supply news is not geopolitically state-dependent against a randomisation-based placebo null (*p*<sub>rand</sub> = 0.73–0.94), and GPR does not predict the policy supply response (min Holm *p* = 1.00). |
@@ -27,7 +32,7 @@ Three ideas in this repository are reusable beyond the application, and are docu
 
 **1. The dimension-matched placebo.** Adding a block of *k* regressors to a forecasting model has an out-of-sample cost even when the block is pure noise, because the larger model must estimate *k* additional coefficients. Comparing "controls" against "controls + GPR" therefore tests a misspecified null: under the null of no incremental information, the larger model is *expected* to lose. Replacing the candidate block with an equal-cardinality block of AR(1) noise restores a median-zero null and makes the Diebold–Mariano statistic pivotal, because the two specifications are then non-nested and equal-dimensional.
 
-**2. The placebo as a reference distribution.** A single placebo draw is a comparison, not a test: it has no reference distribution, so it cannot produce a *p*-value, and it inherits whatever that one draw happened to do. Across three draws in an early version of the supply-side test, the apparent advantage of the GPR interaction over the noise interaction ranged from +5.0 to +15.8 percentage points while the GPR arm itself barely moved — the entire range came from how badly one noise draw performed. The sensitivity is not confined to interactions: in the single-market analysis, changing the noise block from six series to nine while holding the panel, the seed and every other setting fixed moved the placebo arm's *R*²<sub>OS</sub> by up to 3.7 percentage points monthly and 1.4 weekly, in inconsistent directions across estimators. Drawing *D* blocks turns the comparison into a randomisation test with a genuine *p*-value; `placebo_randomization.py` does this for the single-market pipeline and `supply_interaction.py` has it built in.
+**2. The placebo as a reference distribution.** A single placebo draw is a comparison, not a test: it has no reference distribution, so it cannot produce a *p*-value, and it inherits whatever that one draw happened to do. Across three draws in an early version of the supply-side test, the apparent advantage of the GPR interaction over the noise interaction ranged from +5.0 to +15.8 percentage points while the GPR arm itself barely moved — the entire range came from how badly one noise draw performed. The single-market analysis shows how badly one draw can mislead. Seed 42, the draw behind the specification table, turns out to be atypical in *opposite* directions at the two frequencies: weekly it drew an unusually strong noise block (2.2, 1.2 and 2.3 standard deviations above the null mean for Ridge, ElasticNet and gradient boosting), while monthly it drew an unusually weak one for ElasticNet (1.9 below). A single draw therefore manufactured the appearance that the GPR block loses to noise weekly and beats it monthly — the inconsistency being draw luck, not a frequency effect. Drawing *D* blocks replaces that with a randomisation *p*-value, and under it no estimator distinguishes the GPR block from noise at either frequency. `placebo_randomization.py` does this for the single-market pipeline and `supply_interaction.py` has it built in.
 
 **3. Forecast-health diagnostics.** Out-of-sample *R*² is a mean-square statistic, so one catastrophic week moves it by hundreds of percentage points: over ~360 evaluation weeks, a single week with error thirty times the typical magnitude lowers it by roughly 250 points. Every *R*² reported here carries the share of squared error contributed by its worst one per cent of weeks, and an arm whose worst few weeks dominate is flagged rather than interpreted.
 
@@ -71,10 +76,11 @@ Three ideas in this repository are reusable beyond the application, and are docu
 │   ├── F3_r2_distribution.pdf         R2_OS by model family, both frequencies
 │   ├── FA4_crossmarket_gains.pdf      Per-market gains vs controls and vs noise
 │   └── FA5_dependence_power.pdf       Dependence sensitivity and gradient-test power
-└── docs/
-    ├── METHODOLOGY.md                 The three design ideas, stated formally
-    ├── REPRODUCIBILITY.md             How to run; what is and is not included
-    └── DATA.md                        Sources, licensing, what cannot be redistributed
+├── docs/
+│   ├── METHODOLOGY.md                 The three design ideas, stated formally
+│   ├── REPRODUCIBILITY.md             How to run; what is and is not included
+│   └── DATA.md                        Sources, licensing, what cannot be redistributed
+└── (paper/)                           Added at the tagged release; see Citation
 ```
 
 ## Quickstart
